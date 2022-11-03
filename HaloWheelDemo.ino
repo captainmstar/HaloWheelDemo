@@ -36,8 +36,18 @@ CRGB ledsBottom[NUM_LEDS];
 int MIN_D = 100;
 int MAX_D = 600;
 
+//Start and stop indexs for top, bottom, right and left
+//sections of steering wheel.
+int TOP_BOT_START = 11;
+int TOP_BOT_STOP = 47;
+int RIGHT_LEFT_START = 0;
+int RIGHT_LEFT_STOP = 11;
+
+//Error code readings from sensors
 int ERROR_8191 = 8191;
 int ERROR_8190 = 8190;
+
+bool setupSuccess = true;
 
 void setup()
 {
@@ -55,7 +65,13 @@ void setup()
 
 void loop()
 {
-  runBottom();  
+  if(setupSuccess) {
+//      runBottom();  
+//    runTop(); 
+    runRight();
+  } else {
+    Serial.println(F("setup failure - Not running loop"));
+  }
 }
 
 void setupSensors()
@@ -89,8 +105,9 @@ void setupSensors()
   
   if(!sensorTop.init(true)) {
     Serial.println(F("Error starting sensorTop"));
+    setupSuccess = false;
   } else {
-    Serial.println(F("Succes starting sensorTop"));
+    Serial.println(F("Success starting sensorTop"));
   }
   delay(100);
 
@@ -105,8 +122,9 @@ void setupSensors()
   
   if(!sensorBottom.init(true)) {
     Serial.println(F("Error starting sensorBottom"));
+    setupSuccess = false;
   } else {
-    Serial.println(F("Succes starting sensorBottom"));
+    Serial.println(F("Success starting sensorBottom"));
   }
   delay(100);
 
@@ -121,8 +139,9 @@ void setupSensors()
   
   if(!sensorRight.init(true)) {
     Serial.println(F("Error starting sensorRight"));
+    setupSuccess = false;
   } else {
-    Serial.println(F("Succes starting sensorRight"));
+    Serial.println(F("Success starting sensorRight"));
   }
   delay(100);
 
@@ -137,8 +156,9 @@ void setupSensors()
   
   if(!sensorLeft.init(true)) {
     Serial.println(F("Error starting sensorLeft"));
+    setupSuccess = false;
   } else {
-    Serial.println(F("Succes starting sensorLeft"));
+    Serial.println(F("Success starting sensorLeft"));
   }
   delay(100);
 
@@ -163,7 +183,7 @@ void setupSensors()
   sensorTop.startContinuous();
   sensorBottom.startContinuous();
   sensorRight.startContinuous();
-  sensorLeft.startContinuous();
+//  sensorLeft.startContinuous();
   delay(10);
   Serial.println(F("Sensors startContinuous()"));
 }
@@ -194,7 +214,8 @@ void runBottom() {
     runBottomLEDs(bottomDelay); 
   } else if(bottomOn) {
     //turn off bottom
-    turnOffBottom();
+    turnOff(ledsBottom, TOP_BOT_START, TOP_BOT_STOP);
+    bottomOn = false;
   }
   previousBottomReading = currentReading;
 }
@@ -202,42 +223,17 @@ void runBottom() {
 void runBottomLEDs(int delay) {
   if(MAX_D == delay) {
     //turn off bottom
-    turnOffBottom();
+    turnOff(ledsBottom, TOP_BOT_START, TOP_BOT_STOP);
+    bottomOn = false;
   } else if(MIN_D == delay) {
     //solid light
-    solidSectionBottom(11, 47, CRGB::Red); 
+    solidSection(ledsBottom, TOP_BOT_START, TOP_BOT_STOP, CRGB::Red); 
     bottomOn = true;
   } else {
     //flash lights with delay
-    blinkSectionBottom(11, 47, CRGB::Red, delay); 
+    blinkSection(ledsBottom, TOP_BOT_START, TOP_BOT_STOP, CRGB::Red, delay); 
     bottomOn = true;
   }
-}
-
-void turnOffBottom() {
-  solidSectionBottom(11, 47, CRGB::Black); 
-  bottomOn = false;
-}
-
-void blinkSectionBottom(int startIndex, int stopIndex, CRGB::HTMLColorCode color, int blinkDelay) {
-  for(int dot = startIndex; dot < stopIndex; dot++) { 
-    ledsBottom[dot] = color;
-  }
-  FastLED.show();
-  delay(blinkDelay);
-  for(int dot = startIndex; dot < stopIndex; dot++) {
-    ledsBottom[dot].nscale8(20);
-//    ledsBottom[dot] = CRGB::Black;
-  }
-  FastLED.show();
-  delay(blinkDelay);
-}
-
-void solidSectionBottom(int startIndex, int stopIndex, CRGB::HTMLColorCode color) {
-  for(int dot = startIndex; dot < stopIndex; dot++) { 
-    ledsBottom[dot] = color;
-  }
-  FastLED.show();
 }
 
 //Top functions
@@ -254,7 +250,7 @@ void runTop() {
     runTopLEDs(topDelay); 
   } else if(topOn) {
     //turn off top
-    turnOff(ledsTop);
+    turnOff(ledsTop, TOP_BOT_START, TOP_BOT_STOP);
     topOn = false;
   }
   previousTopReading = currentReading;
@@ -263,16 +259,52 @@ void runTop() {
 void runTopLEDs(int delay) {
   if(MAX_D == delay) {
     //turn off top
-    turnOff(ledsTop);
+    turnOff(ledsTop, TOP_BOT_START, TOP_BOT_STOP);
     topOn = false;
   } else if(MIN_D == delay) {
     //solid light
-    solidSection(ledsTop, 11, 47, CRGB::Red); 
+    solidSection(ledsTop, TOP_BOT_START, TOP_BOT_STOP, CRGB::Red); 
     topOn = true;
   } else {
     //flash lights with delay
-    blinkSection(ledsTop, 11, 47, CRGB::Red, delay); 
+    blinkSection(ledsTop, TOP_BOT_START, TOP_BOT_STOP, CRGB::Red, delay); 
     topOn = true;
+  }
+}
+
+//Right functions
+int previousRightReading = 0;
+boolean rightOn = false;
+
+void runRight() {
+  int currentReading = sensorRight.readRangeContinuousMillimeters();
+  if(validReading(currentReading, previousRightReading)) {
+    int rightDelay = mapSensorToDelay(currentReading);
+    Serial.print(F("rightDelay: "));
+    Serial.print(rightDelay);
+    Serial.println();
+    runRightLEDs(rightDelay); 
+  } else if(rightOn) {
+    //turn off top
+    turnOff(ledsTop, ledsBottom, RIGHT_LEFT_START, RIGHT_LEFT_STOP);
+    rightOn = false;
+  }
+  previousRightReading = currentReading;
+}
+
+void runRightLEDs(int delay) {
+  if(MAX_D == delay) {
+    //turn off right
+    turnOff(ledsTop, ledsBottom, RIGHT_LEFT_START, RIGHT_LEFT_STOP);
+    rightOn = false;
+  } else if(MIN_D == delay) {
+    //solid light
+    solidSection(ledsTop, ledsBottom, RIGHT_LEFT_START, RIGHT_LEFT_STOP, CRGB::Red); 
+    rightOn = true;
+  } else {
+    //flash lights with delay
+    blinkSection(ledsTop, ledsBottom, RIGHT_LEFT_START, RIGHT_LEFT_STOP, CRGB::Red, delay); 
+    rightOn = true;
   }
 }
 
@@ -296,47 +328,53 @@ int mapSensorToDelay(uint16_t sensorReading) {
   } else {
     //Round up to next int then convert to hundreds for delay
     return ceil(sensorReading / 100) * 100;
-  }
+  } 
 }
 
 void blinkSection(CRGB leds[], int startIndex, int stopIndex, CRGB::HTMLColorCode color, int blinkDelay) {
+  blinkSection(leds, NULL, startIndex, stopIndex, color, blinkDelay);
+}
+
+void blinkSection(CRGB leds1[], CRGB leds2[], int startIndex, int stopIndex, CRGB::HTMLColorCode color, int blinkDelay) {
   for(int dot = startIndex; dot < stopIndex; dot++) { 
-    leds[dot] = color;
+    leds1[dot] = color;
+    if(leds2) {
+      leds2[dot] = color;
+    }
   }
   FastLED.show();
   delay(blinkDelay);
   for(int dot = startIndex; dot < stopIndex; dot++) {
-    leds[dot].nscale8(20);
-//    leds[dot] = CRGB::Black;
+    leds1[dot].nscale8(20);
+    //    leds[dot] = CRGB::Black;
+    if(leds2) {
+      leds2[dot].nscale8(20);
+    }
   }
   FastLED.show();
   delay(blinkDelay);
 }
 
 void solidSection(CRGB leds[], int startIndex, int stopIndex, CRGB::HTMLColorCode color) {
+  solidSection(leds, NULL, startIndex, stopIndex, color);
+}
+
+void solidSection(CRGB leds1[], CRGB leds2[], int startIndex, int stopIndex, CRGB::HTMLColorCode color) {
   for(int dot = startIndex; dot < stopIndex; dot++) { 
-    ledsTop[dot] = color;
+    leds1[dot] = color;
+    if(leds2) {
+      leds2[dot] = color;
+    }
   }
   FastLED.show();
 }
 
-void turnOff(CRGB leds[]) {
-  solidSection(leds, 11, 47, CRGB::Black); 
+void turnOff(CRGB leds[], int startIndex, int stopIndex) {
+  solidSection(leds, NULL, startIndex, stopIndex, CRGB::Black); 
 }
 
-void blinkSectionAll(int startIndex, int stopIndex, CRGB::HTMLColorCode color, int blinkDelay) {
-  for(int dot = startIndex; dot < stopIndex; dot++) { 
-    ledsTop[dot] = color;
-    ledsBottom[dot] = color;
-  }
-  FastLED.show();
-  delay(blinkDelay);
-  for(int dot = startIndex; dot < stopIndex; dot++) {
-    ledsTop[dot] = CRGB::Black;
-    ledsBottom[dot] = CRGB::Black;
-  }
-  FastLED.show();
-  delay(blinkDelay);
+void turnOff(CRGB leds1[], CRGB leds2[], int startIndex, int stopIndex) {
+  solidSection(leds1, leds2, startIndex, stopIndex, CRGB::Black); 
 }
 
 boolean validReading(int currentReading, int previousReading) {
